@@ -16,6 +16,7 @@
   .cats button { font:inherit; font-size:12px; padding:6px 4px 6px 16px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; position:relative; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:30px; }
   .cats button::before { content:""; position:absolute; left:5px; top:50%; width:7px; height:7px; margin-top:-4px; border-radius:50%; background:var(--c, #999); }
   .cats button.on { background:var(--fg); color:var(--bg); border-color:var(--fg); }
+  .cats .slot { border:1px dashed var(--line); background:var(--soft); min-height:30px; }
   input, textarea { width:100%; font:inherit; padding:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
   textarea { min-height:70px; resize:vertical; }
   .row { display:flex; gap:6px; align-items:center; }
@@ -140,6 +141,9 @@
       b.classList.toggle("on", current.indexOf(c.displayName) !== -1);
       box.appendChild(b);
     });
+    for (var i = master.length; i < MAXCATS; i++) {   // altijd 9 vakjes: lege plekken opvullen
+      var e = document.createElement("div"); e.className = "slot"; box.appendChild(e);
+    }
   }
   function toggleCat(name) {
     var item = Office.context.mailbox.item, on = current.indexOf(name) !== -1;
