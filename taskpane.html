@@ -69,8 +69,7 @@
   .hist:first-child { border-top:0; }
   .hist .d { color:var(--muted); white-space:nowrap; flex:0 0 auto; }
   .hist .x { flex:1; }
-  .hist a { color:var(--muted); font-size:11px; cursor:pointer; text-decoration:none; }
-  .hist a:hover { color:var(--danger); text-decoration:underline; }
+
 
   .rel { border-top:1px solid var(--line); padding:7px 8px; margin:0 -8px; border-radius:var(--r); cursor:pointer; }
   .rel:hover { background:var(--soft); }
@@ -218,10 +217,9 @@
     sys.slice().reverse().forEach(function (n) {
       var el = document.createElement("div"); el.className = "hist";
       var d = document.createElement("span"); d.className = "d"; d.textContent = fmtDate(n.t);
-      var x = document.createElement("span"); x.className = "x"; x.textContent = n.x; x.title = n.a;
-      var del = document.createElement("a"); del.textContent = "×"; del.title = "Regel verwijderen";
-      del.onclick = function () { var i = data.n.indexOf(n); if (i !== -1) { data.n.splice(i, 1); save("Regel verwijderd"); } };
-      el.appendChild(d); el.appendChild(x); el.appendChild(del); hb.appendChild(el);
+      // Naam erbij; regels zijn niet te verwijderen (verantwoording wie wat heeft gewijzigd).
+      var x = document.createElement("span"); x.className = "x"; x.textContent = n.x + " — " + (n.a || "onbekend");
+      el.appendChild(d); el.appendChild(x); hb.appendChild(el);
     });
     if (!notes.length) { box.innerHTML = '<div class="empty">Nog geen notities.</div>'; }
     notes.slice().reverse().forEach(function (n) {
