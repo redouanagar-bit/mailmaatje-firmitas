@@ -10,8 +10,8 @@
   <DefaultLocale>nl-NL</DefaultLocale>
   <DisplayName DefaultValue="Mailmaatje"/>
   <Description DefaultValue="Interne notitie, deadline, verantwoordelijke en status per e-mail."/>
-  <IconUrl DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-128.png"/>
+  <IconUrl DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-128.png"/>
   <SupportUrl DefaultValue="https://youiadvies.nl"/>
   <Hosts>
     <Host Name="Mailbox"/>
@@ -24,7 +24,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://redouanagar-bit.github.io/outlook-notities/taskpane.html"/>
+        <SourceLocation DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/taskpane.html"/>
         <RequestedHeight>250</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -67,12 +67,12 @@
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon16" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-16.png"/>
-          <bt:Image id="Icon32" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-32.png"/>
-          <bt:Image id="Icon80" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-80.png"/>
+          <bt:Image id="Icon16" DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-16.png"/>
+          <bt:Image id="Icon32" DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-32.png"/>
+          <bt:Image id="Icon80" DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="TaskpaneUrl" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/taskpane.html"/>
+          <bt:Url id="TaskpaneUrl" DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/taskpane.html"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Mailmaatje"/>
@@ -116,12 +116,12 @@
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon16" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-16.png"/>
-          <bt:Image id="Icon32" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-32.png"/>
-          <bt:Image id="Icon80" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-80.png"/>
+          <bt:Image id="Icon16" DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-16.png"/>
+          <bt:Image id="Icon32" DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-32.png"/>
+          <bt:Image id="Icon80" DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="TaskpaneUrl" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/taskpane.html"/>
+          <bt:Url id="TaskpaneUrl" DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/taskpane.html"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Mailmaatje"/>

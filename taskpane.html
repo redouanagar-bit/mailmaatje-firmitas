@@ -396,6 +396,7 @@
       cache: { cacheLocation: "localStorage" } };
   }
   function initAuth() {
+    if (!CLIENT_ID) { $("authMsg").textContent = "Agenda, vlag en filter zijn voor deze mailbox nog niet ingericht (geen app-registratie)."; $("auth").hidden = false; $("signIn").hidden = true; return Promise.resolve(); }
     if (!window.msal) { $("authMsg").textContent = "Aanmeldbibliotheek niet geladen."; $("auth").hidden = false; return Promise.resolve(); }
     return msal.createStandardPublicClientApplication(msalConfig()).then(function (app) {
       pca = app;
