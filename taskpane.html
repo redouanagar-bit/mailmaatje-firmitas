@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mailnotities</title>
+<title>Mailmaatje</title>
 <script>
 // Cache omzeilen: GitHub Pages cachet 10 min. Herlaad zichzelf met uniek nummer, behalve in de
 // aanmelddialoog en bij terugkeer van Microsoft (hash met code).
@@ -86,6 +86,10 @@
   .rel .m { font-size:11px; color:var(--muted); }
   .rel .s { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .grp { font-size:11px; font-weight:600; color:var(--muted); margin:8px 0 2px; }
+  .top { padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .top details { margin-top:6px; }
+  #filterList { margin-top:4px; max-height:260px; overflow:auto; }
+  #filterList .rel .c { font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
   .foot { margin-top:14px; font-size:11px; color:var(--muted); }
   #msg { font-size:12px; color:var(--muted); min-height:16px; margin-top:8px; }
@@ -97,7 +101,20 @@
 </head>
 <body>
   <div id="app" hidden>
-    <h1>Interne notitie</h1>
+    <div class="top">
+      <h1>Mailmaatje</h1>
+      <details id="filterBox">
+        <summary>Filter mailbox (<span id="filterCount">0</span> gekozen)</summary>
+        <div class="rem" id="filterCats"></div>
+        <div class="row" style="margin-top:6px;justify-content:space-between">
+          <span class="foot" id="filterState" style="margin:0"></span>
+          <button class="btn lite" id="filterClear">Wis filter</button>
+        </div>
+      </details>
+      <div id="filterList"></div>
+    </div>
+
+    <label>Deze mail</label>
     <div class="sub" id="subject"></div>
 
     <label>Categorieën</label>
@@ -336,6 +353,7 @@
     for (var i = master.length; i < MAXCATS; i++) {   // altijd 9 vakjes: lege plekken opvullen
       var e = document.createElement("div"); e.className = "slot"; box.appendChild(e);
     }
+    renderFilterCats();
   }
   function toggleCat(name) {
     var item = Office.context.mailbox.item, on = current.indexOf(name) !== -1;
@@ -450,6 +468,7 @@
     getToken(false).then(function (token) {
       if (seq !== loadSeq) return;
       $("auth").hidden = true;
+      if (filterSel.length && !$("filterList").children.length) runFilter();
       return currentMessage(token).then(function (m) {
         if (seq !== loadSeq) return;
         return Promise.all([calendarState(token, m), relatedMails(token, m)]);
@@ -565,6 +584,60 @@
     });
   }
 
+  // --- Filter mailbox: mails met gekozen categorieën (via Graph) -----------------------
+  var filterSel = [];
+  function loadFilterSel() { filterSel = Office.context.roamingSettings.get("filter") || []; }
+  function saveFilterSel() { var rs = Office.context.roamingSettings; rs.set("filter", filterSel); rs.saveAsync(function () {}); }
+  function renderFilterCats() {
+    var box = $("filterCats"); box.innerHTML = "";
+    var names = master.map(function (c) { return c.displayName; }); names.push(CATEGORY);
+    names.forEach(function (n) {
+      var l = document.createElement("label");
+      var c = document.createElement("input"); c.type = "checkbox"; c.checked = filterSel.indexOf(n) !== -1;
+      c.onchange = function () {
+        filterSel = filterSel.filter(function (x) { return x !== n; });
+        if (c.checked) filterSel.push(n);
+        saveFilterSel(); runFilter();
+      };
+      l.appendChild(c); l.appendChild(document.createTextNode(n)); box.appendChild(l);
+    });
+    $("filterCount").textContent = filterSel.length;
+  }
+  function runFilter() {
+    $("filterCount").textContent = filterSel.length;
+    var list = $("filterList"), st = $("filterState");
+    if (!filterSel.length) { list.innerHTML = ""; st.textContent = ""; return; }
+    if (!pca) { st.textContent = "Eerst aanmelden."; return; }
+    st.textContent = "Zoeken…";
+    getToken(false).then(function (token) {
+      var since = new Date(); since.setDate(since.getDate() - 365);
+      var parts = filterSel.map(function (n) { return "categories/any(c:c eq '" + n.replace(/'/g, "''") + "')"; });
+      var q = "/me/messages?$filter=receivedDateTime ge " + since.toISOString().replace(/\.\d+Z$/, "Z") + " and (" + parts.join(" or ") + ")" +
+        "&$orderby=receivedDateTime desc&$select=id,subject,from,receivedDateTime,categories&$top=50";
+      return graph("GET", q, null, token).then(function (r) {
+        var rows = r.value || [];
+        list.innerHTML = "";
+        st.textContent = rows.length ? rows.length + (rows.length === 50 ? "+" : "") + " mails" : "Geen mails met deze categorie";
+        rows.forEach(function (x) {
+          var el = document.createElement("div"); el.className = "rel";
+          var mm = document.createElement("div"); mm.className = "m";
+          var from = (x.from && x.from.emailAddress) ? (x.from.emailAddress.name || x.from.emailAddress.address) : "";
+          mm.textContent = fmtDate(x.receivedDateTime) + " · " + from;
+          var sj = document.createElement("div"); sj.className = "s"; sj.textContent = x.subject || "(geen onderwerp)";
+          var cc = document.createElement("div"); cc.className = "c"; cc.textContent = (x.categories || []).join(", ");
+          el.appendChild(mm); el.appendChild(sj); el.appendChild(cc);
+          el.onclick = function () {
+            Office.context.mailbox.displayMessageForm(Office.context.mailbox.convertToEwsId(x.id, Office.MailboxEnums.RestVersion.v2_0));
+          };
+          list.appendChild(el);
+        });
+      });
+    }).catch(function (e) {
+      var t = (e && e.message) || "";
+      st.textContent = /aangemeld|aanmelding|interaction|login/i.test(t) ? "Eerst aanmelden (knop onderaan)." : "Filter mislukt: " + t;
+    });
+  }
+
   // --- Gerelateerde mails: zelfde gesprek + zelfde onderwerp -----------------------
   function cleanSubject(s) {
     return (s || "").replace(/^\s*((re|fw|fwd|aw|wg|tr|antw|doorst)\s*:\s*)+/i, "").replace(/\s+/g, " ").trim();
@@ -624,10 +697,11 @@
     });
     $("signIn").addEventListener("click", function () {
       $("authMsg").textContent = "Aanmelden…";
-      getToken(true).then(function () { $("auth").hidden = true; graphRefresh(loadSeq); })
+      getToken(true).then(function () { $("auth").hidden = true; graphRefresh(loadSeq); runFilter(); })
         .catch(function (e) { $("authMsg").textContent = "Aanmelden mislukt: " + (e.message || e); });
     });
-    loadOwners();
+    loadOwners(); loadFilterSel();
+    $("filterClear").addEventListener("click", function () { filterSel = []; saveFilterSel(); renderFilterCats(); runFilter(); });
     // Bij vastgezet (gepind) paneel: opnieuw laden als je een andere mail selecteert.
     if (Office.context.requirements.isSetSupported("Mailbox", "1.5")) {
       Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, load);

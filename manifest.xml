@@ -5,10 +5,10 @@
            xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
            xsi:type="MailApp">
   <Id>8fef70f2-fe90-4ad6-a34a-be49ddc9893c</Id>
-  <Version>1.0.0.0</Version>
+  <Version>1.1.0.0</Version>
   <ProviderName>YOUI Advies</ProviderName>
   <DefaultLocale>nl-NL</DefaultLocale>
-  <DisplayName DefaultValue="Mailnotities"/>
+  <DisplayName DefaultValue="Mailmaatje"/>
   <Description DefaultValue="Interne notitie, deadline, verantwoordelijke en status per e-mail."/>
   <IconUrl DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://redouanagar-bit.github.io/outlook-notities/icon-128.png"/>
@@ -75,7 +75,7 @@
           <bt:Url id="TaskpaneUrl" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/taskpane.html"/>
         </bt:Urls>
         <bt:ShortStrings>
-          <bt:String id="GroupLabel" DefaultValue="Mailnotities"/>
+          <bt:String id="GroupLabel" DefaultValue="Mailmaatje"/>
           <bt:String id="BtnLabel" DefaultValue="Notitie"/>
         </bt:ShortStrings>
         <bt:LongStrings>
@@ -124,7 +124,7 @@
           <bt:Url id="TaskpaneUrl" DefaultValue="https://redouanagar-bit.github.io/outlook-notities/taskpane.html"/>
         </bt:Urls>
         <bt:ShortStrings>
-          <bt:String id="GroupLabel" DefaultValue="Mailnotities"/>
+          <bt:String id="GroupLabel" DefaultValue="Mailmaatje"/>
           <bt:String id="BtnLabel" DefaultValue="Notitie"/>
         </bt:ShortStrings>
         <bt:LongStrings>
