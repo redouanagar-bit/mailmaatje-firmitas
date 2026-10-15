@@ -5,7 +5,7 @@
            xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
            xsi:type="MailApp">
   <Id>8fef70f2-fe90-4ad6-a34a-be49ddc9893c</Id>
-  <Version>1.1.0.0</Version>
+  <Version>1.2.0.0</Version>
   <ProviderName>YOUI Advies</ProviderName>
   <DefaultLocale>nl-NL</DefaultLocale>
   <DisplayName DefaultValue="Mailmaatje"/>
@@ -13,6 +13,10 @@
   <IconUrl DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://redouanagar-bit.github.io/mailmaatje-firmitas/icon-128.png"/>
   <SupportUrl DefaultValue="https://youiadvies.nl"/>
+  <AppDomains>
+    <AppDomain>https://login.microsoftonline.com</AppDomain>
+    <AppDomain>https://login.live.com</AppDomain>
+  </AppDomains>
   <Hosts>
     <Host Name="Mailbox"/>
   </Hosts>
