@@ -303,25 +303,61 @@
     rs.saveAsync(function () { loadOwners(); });
   }
 
-  // --- Microsoft Graph: aanmelden (Nested App Authentication, met pop-up als terugval) ---
+  // --- Microsoft Graph: aanmelden -----------------------------------------------
+  // Stil (refresh token in localStorage) waar mogelijk; anders een Office-dialoogvenster dat de
+  // Microsoft-aanmelding doet en daarna de tokens in dezelfde localStorage zet.
+  var DIALOG_FLAG = "mn_dialog";
+  function msalConfig() {
+    return { auth: { clientId: CLIENT_ID, authority: "https://login.microsoftonline.com/" + TENANT_ID,
+      redirectUri: location.origin + location.pathname, navigateToLoginRequestUrl: false },
+      cache: { cacheLocation: "localStorage" } };
+  }
   function initAuth() {
     if (!window.msal) { $("authMsg").textContent = "Aanmeldbibliotheek niet geladen."; $("auth").hidden = false; return Promise.resolve(); }
-    var cfg = { auth: { clientId: CLIENT_ID, authority: "https://login.microsoftonline.com/" + TENANT_ID,
-      redirectUri: location.origin + location.pathname }, cache: { cacheLocation: "localStorage" } };
-    var p = (msal.createNestablePublicClientApplication ? msal.createNestablePublicClientApplication(cfg) : msal.createStandardPublicClientApplication(cfg));
-    return p.then(function (app) {
+    return msal.createStandardPublicClientApplication(msalConfig()).then(function (app) {
       pca = app;
+      return pca.handleRedirectPromise().catch(function () { return null; });
+    }).then(function () {
       var accs = pca.getAllAccounts();
       if (accs.length) account = accs[0];
     }).catch(function (e) { $("authMsg").textContent = "Aanmelden niet beschikbaar: " + (e.message || e); $("auth").hidden = false; });
   }
+  // Dialoogvenster-modus: dit venster is geopend om aan te melden.
+  function isDialog() { try { return sessionStorage.getItem(DIALOG_FLAG) === "1" || /[?&]dialog=1/.test(location.search); } catch (e) { return false; } }
+  function runDialog() {
+    try { sessionStorage.setItem(DIALOG_FLAG, "1"); } catch (e) {}
+    document.body.innerHTML = '<div class="empty" id="dlg">Aanmelden bij Microsoft…</div>';
+    msal.createStandardPublicClientApplication(msalConfig()).then(function (app) {
+      return app.handleRedirectPromise().then(function (res) {
+        if (res && res.accessToken) {   // terug van Microsoft: klaar, ouder informeren
+          try { sessionStorage.removeItem(DIALOG_FLAG); } catch (e) {}
+          document.getElementById("dlg").textContent = "Aangemeld. Dit venster sluit vanzelf.";
+          Office.onReady(function () { Office.context.ui.messageParent("ok"); });
+          return;
+        }
+        return app.acquireTokenRedirect({ scopes: SCOPES, prompt: "select_account" });
+      });
+    }).catch(function (e) { document.getElementById("dlg").textContent = "Aanmelden mislukt: " + (e.message || e); });
+  }
+  function interactiveLogin() {
+    return new Promise(function (resolve, reject) {
+      var url = location.origin + location.pathname + "?dialog=1";
+      Office.context.ui.displayDialogAsync(url, { height: 60, width: 35, promptBeforeOpen: false }, function (r) {
+        if (r.status !== Office.AsyncResultStatus.Succeeded) { reject(new Error(r.error.message)); return; }
+        var dlg = r.value;
+        dlg.addEventHandler(Office.EventType.DialogMessageReceived, function () { dlg.close(); resolve(); });
+        dlg.addEventHandler(Office.EventType.DialogEventReceived, function (a) { reject(new Error(a.error === 12006 ? "venster gesloten" : "dialoog " + a.error)); });
+      });
+    });
+  }
   function getToken(interactive) {
     if (!pca) return Promise.reject(new Error("geen aanmelding"));
-    var req = { scopes: SCOPES, account: account || undefined };
-    return pca.acquireTokenSilent(req).then(function (r) { account = r.account; return r.accessToken; })
+    var accs = pca.getAllAccounts(); if (!account && accs.length) account = accs[0];
+    if (!account) return interactive ? interactiveLogin().then(function () { return getToken(false); }) : Promise.reject(new Error("niet aangemeld"));
+    return pca.acquireTokenSilent({ scopes: SCOPES, account: account }).then(function (r) { account = r.account; return r.accessToken; })
       .catch(function (e) {
         if (!interactive) throw e;
-        return pca.acquireTokenPopup({ scopes: SCOPES }).then(function (r) { account = r.account; return r.accessToken; });
+        return interactiveLogin().then(function () { return getToken(false); });
       });
   }
   function graph(method, path, body, token) {
@@ -477,6 +513,7 @@
   }
 
   // --- Start -----------------------------------------------------------------------
+  if (isDialog()) { runDialog(); return; }
   Office.onReady(function () {
     me = (Office.context.mailbox.userProfile && Office.context.mailbox.userProfile.displayName) || "";
     $("cats").addEventListener("click", function (e) {
