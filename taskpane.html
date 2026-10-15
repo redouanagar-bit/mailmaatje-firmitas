@@ -12,9 +12,10 @@
   h1 { font-size:13px; font-weight:600; margin:0 0 2px; }
   .sub { color:var(--muted); font-size:12px; margin-bottom:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:14px 0 4px; }
-  .status { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
-  .status button { font:inherit; padding:6px 4px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
-  .status button.on { background:var(--fg); color:var(--bg); border-color:var(--fg); }
+  .cats { display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; }
+  .cats button { font:inherit; font-size:12px; padding:6px 4px 6px 16px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; position:relative; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-height:30px; }
+  .cats button::before { content:""; position:absolute; left:5px; top:50%; width:7px; height:7px; margin-top:-4px; border-radius:50%; background:var(--c, #999); }
+  .cats button.on { background:var(--fg); color:var(--bg); border-color:var(--fg); }
   input, textarea { width:100%; font:inherit; padding:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
   textarea { min-height:70px; resize:vertical; }
   .row { display:flex; gap:6px; align-items:center; }
@@ -36,13 +37,9 @@
     <h1>Interne notitie</h1>
     <div class="sub" id="subject"></div>
 
-    <label>Status</label>
-    <div class="status" id="status">
-      <button data-s="Niet begonnen">Niet begonnen</button>
-      <button data-s="Begonnen">Begonnen</button>
-      <button data-s="Stagnatie">Stagnatie</button>
-      <button data-s="Afgerond">Afgerond</button>
-    </div>
+    <label>Categorieën</label>
+    <div class="cats" id="cats"></div>
+    <div class="empty" id="catsMsg" hidden></div>
 
     <label for="deadline">Deadline</label>
     <div class="row">
@@ -76,12 +73,15 @@
   var KEY = "mn";            // naam van de custom property op de mail
   var CATEGORY = "Mailnotitie";
   var LIMIT = 2400;          // Outlook staat ca. 2500 tekens aan custom properties per mail toe
-  var props = null, data = null, me = "";
+  var MAXCATS = 9;           // 3 x 3
+  var props = null, data = null, me = "", master = [], current = [];
+  // Outlook-presetkleuren (Preset0..Preset24) naar hex, alleen voor het bolletje voor de naam.
+  var COLORS = ["#e74856","#ff8c00","#a0522d","#ffd700","#107c10","#008272","#808000","#0078d4","#8764b8","#c239b3","#4f6bed","#3a3f5c","#808080","#505050","#000000","#a4262c","#ca5010","#5c2e0e","#986f0b","#0b6a0b","#005b5b","#498205","#004e8c","#5c2d91","#881798"];
 
   function $(id) { return document.getElementById(id); }
   function empty() { return { s: "", d: "", v: "", n: [] }; }
   function msg(t) { $("msg").textContent = t || ""; }
-  function hasContent(d) { return !!(d.s || d.d || d.v || d.n.length); }
+  function hasContent(d) { return !!(d.d || d.v || d.n.length); }
 
   function fmtDate(iso) {
     var x = new Date(iso);
@@ -103,15 +103,62 @@
       if (!Array.isArray(data.n)) data.n = [];
       render(); msg("");
     });
+    loadCats();
+  }
+
+  // Categorieën: lijst uit de mailbox (max. 9), huidige categorieën van de mail, knoppen 3 x 3.
+  function catsSupported() {
+    var item = Office.context.mailbox.item;
+    return !!(item && item.categories && Office.context.mailbox.masterCategories &&
+      Office.context.requirements.isSetSupported("Mailbox", "1.8"));
+  }
+  function loadCats() {
+    var box = $("cats"), note = $("catsMsg");
+    if (!catsSupported()) { box.innerHTML = ""; note.hidden = false; note.textContent = "Categorieën niet beschikbaar in deze Outlook-versie."; return; }
+    Office.context.mailbox.masterCategories.getAsync(function (r) {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) { note.hidden = false; note.textContent = "Categorielijst niet te lezen: " + r.error.message; return; }
+      master = (r.value || []).filter(function (c) { return c.displayName !== CATEGORY; }).slice(0, MAXCATS);
+      Office.context.mailbox.item.categories.getAsync(function (r2) {
+        current = (r2.status === Office.AsyncResultStatus.Succeeded && r2.value) ? r2.value.map(function (c) { return c.displayName; }) : [];
+        renderCats();
+      });
+    });
+  }
+  function colorOf(c) {
+    var m = /Preset(\d+)/.exec(c.color || "");
+    return m ? (COLORS[+m[1]] || "#999") : "#999";
+  }
+  function renderCats() {
+    var box = $("cats"), note = $("catsMsg"); box.innerHTML = "";
+    if (!master.length) { note.hidden = false; note.textContent = "Geen categorieën in deze mailbox."; return; }
+    note.hidden = true;
+    master.forEach(function (c) {
+      var b = document.createElement("button");
+      b.textContent = c.displayName; b.title = c.displayName;
+      b.setAttribute("data-c", c.displayName);
+      b.style.setProperty("--c", colorOf(c));
+      b.classList.toggle("on", current.indexOf(c.displayName) !== -1);
+      box.appendChild(b);
+    });
+  }
+  function toggleCat(name) {
+    var item = Office.context.mailbox.item, on = current.indexOf(name) !== -1;
+    var btns = $("cats").querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
+    msg(on ? "Categorie verwijderen…" : "Categorie toevoegen…");
+    var done = function (r) {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) { msg("Categorie wijzigen mislukt: " + r.error.message); loadCats(); return; }
+      if (on) current = current.filter(function (x) { return x !== name; }); else current.push(name);
+      renderCats(); msg(on ? "Categorie verwijderd: " + name : "Categorie gezet: " + name);
+    };
+    if (on) item.categories.removeAsync([name], done); else item.categories.addAsync([name], done);
   }
 
   function render() {
-    var btns = $("status").querySelectorAll("button");
-    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].getAttribute("data-s") === data.s);
     $("deadline").value = data.d || "";
     $("owner").value = data.v || "";
     var today = new Date(); today.setHours(0, 0, 0, 0);
-    var late = data.d && data.s !== "Afgerond" && new Date(data.d + "T00:00:00") < today;
+    var late = data.d && new Date(data.d + "T00:00:00") < today;
     $("overdue").textContent = late ? "Deadline verstreken" : "";
     var box = $("notes"); box.innerHTML = "";
     if (!data.n.length) { box.innerHTML = '<div class="empty">Nog geen notities.</div>'; }
@@ -175,11 +222,9 @@
 
   Office.onReady(function () {
     me = (Office.context.mailbox.userProfile && Office.context.mailbox.userProfile.displayName) || "";
-    $("status").addEventListener("click", function (e) {
-      var s = e.target.getAttribute && e.target.getAttribute("data-s");
-      if (!s || !data) return;
-      data.s = (data.s === s) ? "" : s;   // nogmaals klikken = status leegmaken
-      save("Status: " + (data.s || "leeg"));
+    $("cats").addEventListener("click", function (e) {
+      var c = e.target.getAttribute && e.target.getAttribute("data-c");
+      if (c) toggleCat(c);   // nogmaals klikken = categorie weer verwijderen
     });
     $("deadline").addEventListener("change", function () { data.d = this.value; save("Deadline opgeslagen"); });
     $("clearDeadline").addEventListener("click", function () { data.d = ""; save("Deadline gewist"); });
