@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mailnotities</title>
+<script>
+// Cache omzeilen: GitHub Pages cachet 10 min. Herlaad zichzelf met uniek nummer, behalve in de
+// aanmelddialoog en bij terugkeer van Microsoft (hash met code).
+(function () {
+  try {
+    if (/[?&](v|dialog)=/.test(location.search) || /(code|error|state)=/.test(location.hash) || sessionStorage.getItem("mn_dialog") === "1") return;
+    location.replace(location.pathname + "?v=" + Date.now());
+  } catch (e) {}
+})();
+</script>
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.25.1/lib/msal-browser.min.js"></script>
 <style>
