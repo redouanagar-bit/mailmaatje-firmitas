@@ -317,8 +317,9 @@
       if (on) current = current.filter(function (x) { return x !== name; }); else current.push(name);
       renderCats();
       // Categoriewijziging in de historie (data is al geladen; anders alleen melden).
-      if (data) { addSys("Categorie " + (on ? "verwijderd: " : "gezet: ") + name); save(on ? "Categorie verwijderd: " + name : "Categorie gezet: " + name); }
-      else msg(on ? "Categorie verwijderd: " + name : "Categorie gezet: " + name);
+      var txt = on ? "Categorie verwijderd: " + name : "Categorie gezet: " + name;
+      if (data) { addSys(txt); save(txt, function () { if (name === DONE_CATEGORY) syncFlag(txt + (on ? ", vlag weer open" : ", vlag voltooid")); }); }
+      else msg(txt);
     };
     if (on) item.categories.removeAsync([name], done); else item.categories.addAsync([name], done);
   }
@@ -510,6 +511,30 @@
       .then(function () { $("fromCal").disabled = false; });
   }
 
+  // --- Outlook-vlag (Opvolgen): deadline = vervaldatum van de vlag, Afgerond = voltooid ----------
+  var DONE_CATEGORY = "Afgerond";
+  function flagBody() {
+    var tz = Office.context.mailbox.userProfile.timeZone || "W. Europe Standard Time";
+    if (current.indexOf(DONE_CATEGORY) !== -1) {
+      return { flagStatus: "complete", completedDateTime: { dateTime: isoLocal(new Date()), timeZone: tz } };
+    }
+    if (!data.d) return { flagStatus: "notFlagged" };
+    var due = localDate(data.d, data.t), start = new Date();
+    if (start > due) start = due;
+    return { flagStatus: "flagged", startDateTime: { dateTime: isoLocal(start), timeZone: tz }, dueDateTime: { dateTime: isoLocal(due), timeZone: tz } };
+  }
+  function syncFlag(okText) {
+    if (!pca || !data) return;
+    getToken(false).then(function (token) {
+      return graph("PATCH", "/me/messages/" + restId(), { flag: flagBody() }, token).then(function () {
+        if (okText) msg(okText);
+      });
+    }).catch(function (e) {
+      var t = (e && e.message) || "";
+      msg(/aangemeld|aanmelding|interaction|login/i.test(t) ? "Opgeslagen. Vlag niet bijgewerkt: eerst aanmelden." : "Vlag bijwerken mislukt: " + t);
+    });
+  }
+
   // --- Gerelateerde mails: zelfde gesprek + zelfde onderwerp -----------------------
   function cleanSubject(s) {
     return (s || "").replace(/^\s*((re|fw|fwd|aw|wg|tr|antw|doorst)\s*:\s*)+/i, "").replace(/\s+/g, " ").trim();
@@ -554,9 +579,9 @@
       var c = e.target.getAttribute && e.target.getAttribute("data-c");
       if (c) toggleCat(c);   // nogmaals klikken = categorie weer verwijderen
     });
-    $("deadline").addEventListener("change", function () { data.d = this.value; save("Deadline opgeslagen"); });
-    $("dtime").addEventListener("change", function () { data.t = this.value; save("Tijd opgeslagen"); });
-    $("clearDeadline").addEventListener("click", function () { data.d = ""; data.t = ""; save("Deadline gewist"); });
+    $("deadline").addEventListener("change", function () { data.d = this.value; save("Deadline opgeslagen", function () { syncFlag("Deadline opgeslagen, vlag gezet"); }); });
+    $("dtime").addEventListener("change", function () { data.t = this.value; save("Tijd opgeslagen", function () { syncFlag("Tijd opgeslagen, vlag bijgewerkt"); }); });
+    $("clearDeadline").addEventListener("click", function () { data.d = ""; data.t = ""; save("Deadline gewist", function () { syncFlag("Deadline gewist, vlag verwijderd"); }); });
     $("toCal").addEventListener("click", toCalendar);
     $("fromCal").addEventListener("click", fromCalendar);
     $("owner").addEventListener("change", function () {
