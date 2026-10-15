@@ -171,12 +171,16 @@
       var el = document.createElement("div"); el.className = "note";
       var meta = document.createElement("div"); meta.className = "meta";
       var who = document.createElement("span"); who.textContent = fmtDate(n.t) + " · " + n.a;
+      // Geen confirm(): Outlook blokkeert browserpop-ups in add-ins. Bevestiging in het paneel zelf.
       var del = document.createElement("a"); del.textContent = "verwijder";
-      del.onclick = function () {
-        if (!confirm("Deze notitie verwijderen?")) return;
-        data.n.splice(real, 1); save("Notitie verwijderd");
-      };
-      meta.appendChild(who); meta.appendChild(del);
+      var ask = document.createElement("span"); ask.hidden = true;
+      var yes = document.createElement("a"); yes.textContent = "verwijderen";
+      var no = document.createElement("a"); no.textContent = "annuleren"; no.style.marginLeft = "8px";
+      ask.appendChild(document.createTextNode("Zeker? ")); ask.appendChild(yes); ask.appendChild(no);
+      del.onclick = function () { del.hidden = true; ask.hidden = false; };
+      no.onclick = function () { ask.hidden = true; del.hidden = false; };
+      yes.onclick = function () { data.n.splice(real, 1); save("Notitie verwijderd"); };
+      meta.appendChild(who); meta.appendChild(del); meta.appendChild(ask);
       var txt = document.createElement("div"); txt.className = "txt"; txt.textContent = n.x;
       el.appendChild(meta); el.appendChild(txt); box.appendChild(el);
     });
