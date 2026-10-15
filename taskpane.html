@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mailnotities</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  :root { --fg:#1a1a1a; --muted:#6b6b6b; --line:#cfcfcf; --bg:#ffffff; --soft:#f4f4f4; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:12px; font:13px/1.4 "Segoe UI", system-ui, sans-serif; color:var(--fg); background:var(--bg); }
+  h1 { font-size:13px; font-weight:600; margin:0 0 2px; }
+  .sub { color:var(--muted); font-size:12px; margin-bottom:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:14px 0 4px; }
+  .status { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+  .status button { font:inherit; padding:6px 4px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
+  .status button.on { background:var(--fg); color:var(--bg); border-color:var(--fg); }
+  input, textarea { width:100%; font:inherit; padding:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+  textarea { min-height:70px; resize:vertical; }
+  .row { display:flex; gap:6px; align-items:center; }
+  .row input { flex:1; }
+  .btn { font:inherit; padding:6px 10px; border:1px solid var(--fg); background:var(--fg); color:var(--bg); cursor:pointer; }
+  .btn.lite { background:var(--bg); color:var(--fg); border-color:var(--line); }
+  .warn { font-size:12px; margin-top:4px; font-weight:600; }
+  .note { border-top:1px solid var(--line); padding:8px 0; }
+  .note .meta { font-size:11px; color:var(--muted); display:flex; justify-content:space-between; }
+  .note .meta a { color:var(--muted); cursor:pointer; text-decoration:underline; }
+  .note .txt { white-space:pre-wrap; margin-top:2px; }
+  .foot { margin-top:14px; font-size:11px; color:var(--muted); }
+  #msg { font-size:12px; color:var(--muted); min-height:16px; margin-top:6px; }
+  .empty { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+  <div id="app" hidden>
+    <h1>Interne notitie</h1>
+    <div class="sub" id="subject"></div>
+
+    <label>Status</label>
+    <div class="status" id="status">
+      <button data-s="Niet begonnen">Niet begonnen</button>
+      <button data-s="Begonnen">Begonnen</button>
+      <button data-s="Stagnatie">Stagnatie</button>
+      <button data-s="Afgerond">Afgerond</button>
+    </div>
+
+    <label for="deadline">Deadline</label>
+    <div class="row">
+      <input type="date" id="deadline">
+      <button class="btn lite" id="clearDeadline" title="Deadline wissen">Wis</button>
+    </div>
+    <div class="warn" id="overdue"></div>
+
+    <label for="owner">Verantwoordelijke</label>
+    <input id="owner" list="ownerList" placeholder="Naam">
+    <datalist id="ownerList"></datalist>
+
+    <label for="newNote">Notitie toevoegen</label>
+    <textarea id="newNote" placeholder="Typ een notitie…"></textarea>
+    <div class="row" style="justify-content:space-between;margin-top:6px">
+      <span class="foot" id="space"></span>
+      <button class="btn" id="addNote">Toevoegen</button>
+    </div>
+
+    <label>Notities</label>
+    <div id="notes"></div>
+
+    <div id="msg"></div>
+    <div class="foot">Alleen zichtbaar in deze mailbox. Wordt niet meegestuurd bij beantwoorden of doorsturen.</div>
+  </div>
+  <div id="none" class="empty" hidden>Selecteer een e-mail.</div>
+
+<script>
+(function () {
+  "use strict";
+  var KEY = "mn";            // naam van de custom property op de mail
+  var CATEGORY = "Mailnotitie";
+  var LIMIT = 2400;          // Outlook staat ca. 2500 tekens aan custom properties per mail toe
+  var props = null, data = null, me = "";
+
+  function $(id) { return document.getElementById(id); }
+  function empty() { return { s: "", d: "", v: "", n: [] }; }
+  function msg(t) { $("msg").textContent = t || ""; }
+  function hasContent(d) { return !!(d.s || d.d || d.v || d.n.length); }
+
+  function fmtDate(iso) {
+    var x = new Date(iso);
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return p(x.getDate()) + "-" + p(x.getMonth() + 1) + "-" + x.getFullYear() + " " + p(x.getHours()) + ":" + p(x.getMinutes());
+  }
+
+  function load() {
+    var item = Office.context.mailbox.item;
+    if (!item) { $("app").hidden = true; $("none").hidden = false; return; }
+    $("none").hidden = true; $("app").hidden = false;
+    $("subject").textContent = item.subject || "(geen onderwerp)";
+    $("newNote").value = "";
+    msg("Laden…");
+    item.loadCustomPropertiesAsync(function (r) {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) { msg("Kon notities niet laden: " + r.error.message); return; }
+      props = r.value;
+      try { data = JSON.parse(props.get(KEY) || "null") || empty(); } catch (e) { data = empty(); }
+      if (!Array.isArray(data.n)) data.n = [];
+      render(); msg("");
+    });
+  }
+
+  function render() {
+    var btns = $("status").querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].getAttribute("data-s") === data.s);
+    $("deadline").value = data.d || "";
+    $("owner").value = data.v || "";
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var late = data.d && data.s !== "Afgerond" && new Date(data.d + "T00:00:00") < today;
+    $("overdue").textContent = late ? "Deadline verstreken" : "";
+    var box = $("notes"); box.innerHTML = "";
+    if (!data.n.length) { box.innerHTML = '<div class="empty">Nog geen notities.</div>'; }
+    data.n.slice().reverse().forEach(function (n, idx) {
+      var real = data.n.length - 1 - idx;
+      var el = document.createElement("div"); el.className = "note";
+      var meta = document.createElement("div"); meta.className = "meta";
+      var who = document.createElement("span"); who.textContent = fmtDate(n.t) + " · " + n.a;
+      var del = document.createElement("a"); del.textContent = "verwijder";
+      del.onclick = function () {
+        if (!confirm("Deze notitie verwijderen?")) return;
+        data.n.splice(real, 1); save("Notitie verwijderd");
+      };
+      meta.appendChild(who); meta.appendChild(del);
+      var txt = document.createElement("div"); txt.className = "txt"; txt.textContent = n.x;
+      el.appendChild(meta); el.appendChild(txt); box.appendChild(el);
+    });
+    $("space").textContent = "Ruimte: " + Math.max(0, LIMIT - JSON.stringify(data).length) + " tekens";
+  }
+
+  function save(okText) {
+    var json = JSON.stringify(data);
+    if (json.length > LIMIT) {
+      msg("Te veel tekst voor deze mail (max. ca. " + LIMIT + " tekens). Verwijder een oude notitie of kort in.");
+      load(); return;
+    }
+    if (hasContent(data)) props.set(KEY, json); else props.remove(KEY);
+    msg("Opslaan…");
+    props.saveAsync(function (r) {
+      if (r.status !== Office.AsyncResultStatus.Succeeded) { msg("Opslaan mislukt: " + r.error.message); return; }
+      render(); msg(okText || "Opgeslagen");
+      setCategory(hasContent(data));
+    });
+  }
+
+  // Zet categorie "Mailnotitie" op de mail, zodat je in de maillijst ziet/filtert welke mails een notitie hebben.
+  function setCategory(on) {
+    var item = Office.context.mailbox.item;
+    if (!item || !item.categories || !Office.context.requirements.isSetSupported("Mailbox", "1.8")) return;
+    if (!on) { item.categories.removeAsync([CATEGORY], function () {}); return; }
+    item.categories.addAsync([CATEGORY], function (r) {
+      if (r.status === Office.AsyncResultStatus.Succeeded) return;
+      Office.context.mailbox.masterCategories.addAsync(
+        [{ displayName: CATEGORY, color: Office.MailboxEnums.CategoryColor.Preset14 }],
+        function () { item.categories.addAsync([CATEGORY], function () {}); });
+    });
+  }
+
+  function loadOwners() {
+    var list = Office.context.roamingSettings.get("owners") || [];
+    var dl = $("ownerList"); dl.innerHTML = "";
+    list.forEach(function (n) { var o = document.createElement("option"); o.value = n; dl.appendChild(o); });
+  }
+  function rememberOwner(name) {
+    if (!name) return;
+    var rs = Office.context.roamingSettings, list = rs.get("owners") || [];
+    if (list.indexOf(name) !== -1) return;
+    list.push(name); list.sort(); rs.set("owners", list.slice(0, 50));
+    rs.saveAsync(function () { loadOwners(); });
+  }
+
+  Office.onReady(function () {
+    me = (Office.context.mailbox.userProfile && Office.context.mailbox.userProfile.displayName) || "";
+    $("status").addEventListener("click", function (e) {
+      var s = e.target.getAttribute && e.target.getAttribute("data-s");
+      if (!s || !data) return;
+      data.s = (data.s === s) ? "" : s;   // nogmaals klikken = status leegmaken
+      save("Status: " + (data.s || "leeg"));
+    });
+    $("deadline").addEventListener("change", function () { data.d = this.value; save("Deadline opgeslagen"); });
+    $("clearDeadline").addEventListener("click", function () { data.d = ""; save("Deadline gewist"); });
+    $("owner").addEventListener("change", function () {
+      data.v = this.value.trim(); rememberOwner(data.v); save("Verantwoordelijke opgeslagen");
+    });
+    $("addNote").addEventListener("click", function () {
+      var t = $("newNote").value.trim(); if (!t) return;
+      data.n.push({ t: new Date().toISOString(), a: me, x: t });
+      $("newNote").value = ""; save("Notitie toegevoegd");
+    });
+    loadOwners();
+    // Bij vastgezet (gepind) paneel: opnieuw laden als je een andere mail selecteert.
+    if (Office.context.requirements.isSetSupported("Mailbox", "1.5")) {
+      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, load);
+    }
+    load();
+  });
+})();
+</script>
+</body>
+</html>
