@@ -160,6 +160,7 @@
     </details>
     <div class="row" style="margin-top:8px">
       <button class="btn" id="saveDeadline">Opslaan</button>
+      <button class="btn lite" id="doneDeadline">Afgerond</button>
       <button class="btn lite" id="clearDeadline">Wis deadline</button>
     </div>
     <div class="warn" id="overdue"></div>
@@ -208,12 +209,11 @@
       <button class="btn lite" id="dossierBtn">Dossier samenstellen</button>
     </div>
 
-    <label>Gerelateerde mails</label>
-    <div id="related" class="empty">—</div>
+    <div id="related" hidden></div>
 
     <div id="msg"></div>
     <div id="auth" hidden>
-      <button class="btn lite" id="signIn">Aanmelden voor agenda en gerelateerde mails</button>
+      <button class="btn lite" id="signIn">Aanmelden voor vlag, agenda, dossiers en overzicht</button>
       <div class="foot" id="authMsg"></div>
     </div>
     <div class="foot">Alleen zichtbaar in deze mailbox. Wordt niet meegestuurd bij beantwoorden of doorsturen.</div>
@@ -302,7 +302,7 @@
   function $(id) { return document.getElementById(id); }
   function empty() { return { d: "", t: "", r: [], v: "", n: [] }; }
   function msg(t) { $("msg").textContent = t || ""; }
-  function hasContent(d) { return !!(d.d || d.v || d.n.length); }
+  function hasContent(d) { return !!(d.d || d.v || d.n.length || d.done); }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   function fmtDate(iso) {
     var x = new Date(iso);
@@ -342,7 +342,8 @@
     $("dtime").value = data.t || "09:00";
     var today = new Date(); today.setHours(0, 0, 0, 0);
     var late = data.d && new Date(data.d + "T00:00:00") < today;
-    $("overdue").textContent = late ? "Deadline verstreken" : "";
+    $("overdue").textContent = data.done ? "" : (late ? "Deadline verstreken" : "");
+    $("doneDeadline").textContent = data.done ? "Afgerond \u2713" : "Afgerond"; $("doneDeadline").disabled = !!data.done;
     $("owner").value = data.v || "";
     renderReminders();
     var box = $("notes"); box.innerHTML = "";
@@ -608,7 +609,7 @@
       });
     }).catch(function () {
       if (seq !== loadSeq) return;
-      $("auth").hidden = false; $("authMsg").textContent = "Eenmalig aanmelden voor agenda en gerelateerde mails.";
+      $("auth").hidden = false; $("authMsg").textContent = "Eenmalig aanmelden voor vlag, agenda, dossiers en overzicht.";
     });
   }
 
@@ -696,7 +697,7 @@
   var DONE_CATEGORY = "Afgerond";
   function flagBody() {
     var tz = Office.context.mailbox.userProfile.timeZone || "W. Europe Standard Time";
-    if (current.indexOf(DONE_CATEGORY) !== -1) {
+    if ((data && data.done) || current.indexOf(DONE_CATEGORY) !== -1) {
       return { flagStatus: "complete", completedDateTime: { dateTime: isoLocal(new Date()), timeZone: tz } };
     }
     if (!data.d) return { flagStatus: "notFlagged" };
@@ -1140,15 +1141,24 @@
     $("deadline").addEventListener("change", function () { data.d = this.value; msg("Klik op Opslaan om de deadline vast te zetten."); });
     $("dtime").addEventListener("change", function () { data.t = this.value; msg("Klik op Opslaan om de deadline vast te zetten."); });
     $("saveDeadline").addEventListener("click", function () {
-      data.d = $("deadline").value; data.t = $("dtime").value;
+      data.d = $("deadline").value; data.t = $("dtime").value; data.done = false;
       if (!data.d) { msg("Vul eerst een datum in."); return; }
       addSys("Deadline " + fmtD(data.d) + " " + (data.t || "09:00") + (data.r.length ? ", herinnering " + data.r.map(remLabel).join(", ") + " vooraf" : ", zonder herinneringen"));
       save("Deadline opgeslagen", function () { syncFlag("Deadline opgeslagen: vlag gezet" + (data.r.length ? ", agenda bijgewerkt" : "")); syncCalendar(); });
     });
+    $("doneDeadline").addEventListener("click", function () {
+      if (!data.d) { msg("Er staat geen deadline."); return; }
+      data.done = true; var hadRem = data.r.length; data.r = [];
+      addSys("Deadline afgerond: vlag voltooid" + (hadRem ? ", herinneringen uit agenda verwijderd" : ""));
+      save("Deadline afgerond", function () {
+        syncFlag("Afgerond: vlag voltooid");
+        getToken(false).then(function (token) { return currentMessage(token).then(function (m) { return removeEvents(token, m).then(function () { return calendarState(token, m); }); }); }).catch(function () {});
+      });
+    });
     $("clearDeadline").addEventListener("click", function () {
       if (!data.d && !data.r.length && !$("deadline").value) { msg("Er staat geen deadline."); return; }
       var hadRem = data.r.length;
-      data.d = ""; data.t = ""; data.r = [];
+      data.d = ""; data.t = ""; data.r = []; data.done = false;
       addSys("Deadline gewist" + (hadRem ? " (incl. " + hadRem + " herinnering" + (hadRem > 1 ? "en" : "") + ")" : ""));
       save("Deadline gewist", function () {
         syncFlag("Deadline gewist, vlag weg");
